@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Context};
 use niri_ipc::{
-    KeyboardLayouts, LogicalOutput, Mode, Output, OutputConfigChanged, Request, Response, Socket,
-    Transform,
+    Event, KeyboardLayouts, LogicalOutput, Mode, Output, OutputConfigChanged, Request, Response,
+    Socket, Transform,
 };
 use serde_json::json;
 
@@ -21,12 +21,13 @@ pub fn handle_msg(msg: Msg, json: bool) -> anyhow::Result<()> {
         },
         Msg::Workspaces => Request::Workspaces,
         Msg::KeyboardLayouts => Request::KeyboardLayouts,
+        Msg::EventStream => Request::EventStream,
         Msg::RequestError => Request::ReturnError,
     };
 
     let socket = Socket::connect().context("error connecting to the niri socket")?;
 
-    let reply = socket
+    let (reply, mut read_event) = socket
         .send(request)
         .context("error communicating with niri")?;
 
@@ -37,6 +38,7 @@ pub fn handle_msg(msg: Msg, json: bool) -> anyhow::Result<()> {
             Socket::connect()
                 .and_then(|socket| socket.send(Request::Version))
                 .ok()
+                .map(|(reply, _read_event)| reply)
         }
         _ => None,
     };
@@ -259,6 +261,37 @@ pub fn handle_msg(msg: Msg, json: bool) -> anyhow::Result<()> {
             for (idx, name) in names.iter().enumerate() {
                 let is_active = if idx == current_idx { " * " } else { "   " };
                 println!("{is_active}{idx} {name}");
+            }
+        }
+        Msg::EventStream => {
+            let Response::Handled = response else {
+                bail!("unexpected response: expected Handled, got {response:?}");
+            };
+
+            println!("Started reading events.");
+
+            loop {
+                let event = read_event().context("error reading event from niri")?;
+                match event {
+                    Event::WorkspaceCreated { workspace } => {
+                        println!("Workspace created: {workspace:?}");
+                    }
+                    Event::WorkspaceRemoved { id } => {
+                        println!("Workspace removed: {id}");
+                    }
+                    Event::WorkspaceSwitched { output, id } => {
+                        println!("Workspace switched on output \"{output}\": {id}");
+                    }
+                    Event::WorkspaceMoved { id, output, idx } => {
+                        println!("Workspace moved: {id} to output \"{output}\", index {idx}");
+                    }
+                    Event::WindowFocused { window } => {
+                        println!("Window focused: {window:?}");
+                    }
+                    Event::KeyboardLayoutChanged { name } => {
+                        println!("Keyboard layout changed: \"{name}\"");
+                    }
+                }
             }
         }
     }
