@@ -268,28 +268,40 @@ pub fn handle_msg(msg: Msg, json: bool) -> anyhow::Result<()> {
                 bail!("unexpected response: expected Handled, got {response:?}");
             };
 
-            println!("Started reading events.");
+            if !json {
+                println!("Started reading events.");
+            }
 
             loop {
                 let event = read_event().context("error reading event from niri")?;
+
+                if json {
+                    let event = serde_json::to_string(&event).context("error formatting event")?;
+                    println!("{event}");
+                    continue;
+                }
+
                 match event {
-                    Event::WorkspaceCreated { workspace } => {
-                        println!("Workspace created: {workspace:?}");
-                    }
-                    Event::WorkspaceRemoved { id } => {
-                        println!("Workspace removed: {id}");
+                    Event::WorkspacesChanged { workspaces } => {
+                        println!("Workspaces changed: {workspaces:?}");
                     }
                     Event::WorkspaceSwitched { output, id } => {
-                        println!("Workspace switched on output \"{output}\": {id}");
+                        println!("Workspace switched on output {output:?}: {id}");
                     }
-                    Event::WorkspaceMoved { id, output, idx } => {
-                        println!("Workspace moved: {id} to output \"{output}\", index {idx}");
+                    Event::WindowOpened { window } => {
+                        println!("Window opened: {window:?}");
                     }
-                    Event::WindowFocused { window } => {
-                        println!("Window focused: {window:?}");
+                    Event::WindowClosed { id } => {
+                        println!("Window closed: {id}");
                     }
-                    Event::KeyboardLayoutChanged { name } => {
-                        println!("Keyboard layout changed: \"{name}\"");
+                    Event::WindowFocused { id } => {
+                        println!("Window focused: {id:?}");
+                    }
+                    Event::KeyboardLayoutsChanged { keyboard_layouts } => {
+                        println!("Keyboard layouts changed: {keyboard_layouts:?}");
+                    }
+                    Event::KeyboardLayoutSwitched { idx } => {
+                        println!("Keyboard layout switched: {idx}");
                     }
                 }
             }

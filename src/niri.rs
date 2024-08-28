@@ -501,7 +501,12 @@ impl State {
         let mut niri = Niri::new(config.clone(), event_loop, stop_signal, display, &backend);
         backend.init(&mut niri);
 
-        Ok(Self { backend, niri })
+        let mut state = Self { backend, niri };
+
+        // Initialize some IPC server state.
+        state.ipc_keyboard_layouts_changed();
+
+        Ok(state)
     }
 
     pub fn refresh_and_flush_clients(&mut self) {
@@ -537,6 +542,7 @@ impl State {
         foreign_toplevel::refresh(self);
         self.niri.refresh_window_rules();
         self.refresh_ipc_outputs();
+        self.ipc_refresh_workspaces();
 
         #[cfg(feature = "xdp-gnome-screencast")]
         self.niri.refresh_mapped_cast_outputs();
@@ -855,7 +861,7 @@ impl State {
             {
                 if let Some((mapped, _)) = self.niri.layout.find_window_and_output_mut(surface) {
                     mapped.set_is_focused(true);
-                    newly_focused_window = Some(mapped.window.clone());
+                    newly_focused_window = Some((mapped.id(), mapped.window.clone()));
                 }
             }
 
@@ -912,6 +918,10 @@ impl State {
                     keyboard.with_xkb_state(self, |mut context| {
                         context.set_layout(new_layout);
                     });
+
+                    if let Some(server) = &self.niri.ipc_server {
+                        server.keyboard_layout_switched(new_layout.0 as u8);
+                    }
                 }
             }
 
@@ -1077,6 +1087,8 @@ impl State {
             if let Err(err) = keyboard.set_xkb_config(self, xkb.to_xkb_config()) {
                 warn!("error updating xkb config: {err:?}");
             }
+
+            self.ipc_keyboard_layouts_changed();
         }
 
         if libinput_config_changed {

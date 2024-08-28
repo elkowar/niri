@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -12,7 +13,8 @@ use calloop::io::Async;
 use directories::BaseDirs;
 use futures_util::io::{AsyncReadExt, BufReader};
 use futures_util::{select_biased, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, FutureExt as _};
-use niri_ipc::{Event, KeyboardLayouts, OutputConfigChanged, Reply, Request, Response};
+use niri_ipc::state::{EventStreamState, EventStreamStatePart as _};
+use niri_ipc::{Event, KeyboardLayouts, OutputConfigChanged, Reply, Request, Response, Workspace};
 use smithay::desktop::Window;
 use smithay::input::keyboard::XkbContextHandler;
 use smithay::reexports::calloop::generic::Generic;
@@ -24,6 +26,7 @@ use smithay::wayland::shell::xdg::XdgToplevelSurfaceData;
 use crate::backend::IpcOutputMap;
 use crate::niri::State;
 use crate::utils::version;
+use crate::window::mapped::MappedId;
 
 // If an event stream client fails to read events fast enough that we accumulate more than this
 // number in our buffer, we drop that event stream client.
@@ -32,15 +35,17 @@ const EVENT_STREAM_BUFFER_SIZE: usize = 64;
 pub struct IpcServer {
     pub socket_path: PathBuf,
     event_streams: Rc<RefCell<Vec<EventStreamSender>>>,
-    focused_window: Arc<Mutex<Option<Window>>>,
+    event_stream_state: Rc<RefCell<EventStreamState>>,
+    focused_window: Arc<Mutex<Option<(MappedId, Window)>>>,
 }
 
 struct ClientCtx {
     event_loop: LoopHandle<'static, State>,
     scheduler: Scheduler<()>,
     ipc_outputs: Arc<Mutex<IpcOutputMap>>,
-    focused_window: Arc<Mutex<Option<Window>>>,
+    focused_window: Arc<Mutex<Option<(MappedId, Window)>>>,
     event_streams: Rc<RefCell<Vec<EventStreamSender>>>,
+    event_stream_state: Rc<RefCell<EventStreamState>>,
 }
 
 struct EventStreamClient {
@@ -86,6 +91,7 @@ impl IpcServer {
         Ok(Self {
             socket_path,
             event_streams: Rc::new(RefCell::new(Vec::new())),
+            event_stream_state: Rc::new(RefCell::new(EventStreamState::default())),
             focused_window: Arc::new(Mutex::new(None)),
         })
     }
@@ -113,7 +119,7 @@ impl IpcServer {
         }
     }
 
-    pub fn focused_window_changed(&self, focused_window: Option<Window>) {
+    pub fn focused_window_changed(&self, focused_window: Option<(MappedId, Window)>) {
         let mut guard = self.focused_window.lock().unwrap();
         if *guard == focused_window {
             return;
@@ -121,24 +127,15 @@ impl IpcServer {
 
         guard.clone_from(&focused_window);
         drop(guard);
+    }
 
-        let window = focused_window.map(|window| {
-            let wl_surface = window.toplevel().expect("no X11 support").wl_surface();
-            with_states(wl_surface, |states| {
-                let role = states
-                    .data_map
-                    .get::<XdgToplevelSurfaceData>()
-                    .unwrap()
-                    .lock()
-                    .unwrap();
+    pub fn keyboard_layout_switched(&self, new_idx: u8) {
+        let mut state = self.event_stream_state.borrow_mut();
+        let state = &mut state.keyboard_layouts;
 
-                niri_ipc::Window {
-                    title: role.title.clone(),
-                    app_id: role.app_id.clone(),
-                }
-            })
-        });
-        self.send_event(Event::WindowFocused { window })
+        let event = Event::KeyboardLayoutSwitched { idx: new_idx };
+        state.apply(event.clone());
+        self.send_event(event);
     }
 }
 
@@ -176,6 +173,7 @@ fn on_new_ipc_client(state: &mut State, stream: UnixStream) {
         ipc_outputs: state.backend.ipc_outputs(),
         focused_window: ipc_server.focused_window.clone(),
         event_streams: ipc_server.event_streams.clone(),
+        event_stream_state: ipc_server.event_stream_state.clone(),
     };
 
     let future = async move {
@@ -239,24 +237,14 @@ async fn handle_client(ctx: ClientCtx, stream: Async<'static, UnixStream>) -> an
         }
 
         // Send the initial state.
-        let window = ctx.focused_window.lock().unwrap().clone();
-        let window = window.map(|window| {
-            let wl_surface = window.toplevel().expect("no X11 support").wl_surface();
-            with_states(wl_surface, |states| {
-                let role = states
-                    .data_map
-                    .get::<XdgToplevelSurfaceData>()
-                    .unwrap()
-                    .lock()
-                    .unwrap();
-
-                niri_ipc::Window {
-                    title: role.title.clone(),
-                    app_id: role.app_id.clone(),
-                }
-            })
-        });
-        events_tx.try_send(Event::WindowFocused { window }).unwrap();
+        {
+            let state = ctx.event_stream_state.borrow();
+            for event in state.reproduce() {
+                events_tx
+                    .try_send(event)
+                    .expect("initial event burst had more events than buffer size");
+            }
+        }
 
         // Add it to the list.
         {
@@ -283,7 +271,7 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
         }
         Request::FocusedWindow => {
             let window = ctx.focused_window.lock().unwrap().clone();
-            let window = window.map(|window| {
+            let window = window.map(|(id, window)| {
                 let wl_surface = window.toplevel().expect("no X11 support").wl_surface();
                 with_states(wl_surface, |states| {
                     let role = states
@@ -294,6 +282,7 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
                         .unwrap();
 
                     niri_ipc::Window {
+                        id: u64::from(id.get()),
                         title: role.title.clone(),
                         app_id: role.app_id.clone(),
                     }
@@ -335,13 +324,8 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
             Response::OutputConfigChanged(response)
         }
         Request::Workspaces => {
-            let (tx, rx) = async_channel::bounded(1);
-            ctx.event_loop.insert_idle(move |state| {
-                let workspaces = state.niri.layout.ipc_workspaces();
-                let _ = tx.send_blocking(workspaces);
-            });
-            let result = rx.recv().await;
-            let workspaces = result.map_err(|_| String::from("error getting workspace info"))?;
+            let state = ctx.event_stream_state.borrow();
+            let workspaces = state.workspaces.workspaces.values().cloned().collect();
             Response::Workspaces(workspaces)
         }
         Request::FocusedOutput => {
@@ -371,20 +355,9 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
             Response::FocusedOutput(output)
         }
         Request::KeyboardLayouts => {
-            let (tx, rx) = async_channel::bounded(1);
-            ctx.event_loop.insert_idle(move |state| {
-                let keyboard = state.niri.seat.get_keyboard().unwrap();
-                let layout = keyboard.with_xkb_state(state, |context| {
-                    let layouts = context.keymap().layouts();
-                    KeyboardLayouts {
-                        names: layouts.map(str::to_owned).collect(),
-                        current_idx: context.active_layout().0 as u8,
-                    }
-                });
-                let _ = tx.send_blocking(layout);
-            });
-            let result = rx.recv().await;
-            let layout = result.map_err(|_| String::from("error getting layout info"))?;
+            let state = ctx.event_stream_state.borrow();
+            let layout = state.keyboard_layouts.keyboard_layouts.clone();
+            let layout = layout.expect("keyboard layouts should be set at startup");
             Response::KeyboardLayouts(layout)
         }
         Request::EventStream => Response::Handled,
@@ -418,4 +391,101 @@ async fn handle_event_stream_client(client: EventStreamClient) -> anyhow::Result
     }
 
     Ok(())
+}
+
+impl State {
+    pub fn ipc_keyboard_layouts_changed(&mut self) {
+        let keyboard = self.niri.seat.get_keyboard().unwrap();
+        let keyboard_layouts = keyboard.with_xkb_state(self, |context| {
+            let layouts = context.keymap().layouts();
+            KeyboardLayouts {
+                names: layouts.map(str::to_owned).collect(),
+                current_idx: context.active_layout().0 as u8,
+            }
+        });
+
+        let Some(server) = &self.niri.ipc_server else {
+            return;
+        };
+
+        let mut state = server.event_stream_state.borrow_mut();
+        let state = &mut state.keyboard_layouts;
+
+        let event = Event::KeyboardLayoutsChanged { keyboard_layouts };
+        state.apply(event.clone());
+        server.send_event(event);
+    }
+
+    pub fn ipc_refresh_workspaces(&mut self) {
+        let Some(server) = &self.niri.ipc_server else {
+            return;
+        };
+
+        let _span = tracy_client::span!("State::ipc_refresh_workspaces");
+
+        let mut state = server.event_stream_state.borrow_mut();
+        let state = &mut state.workspaces;
+
+        let mut events = Vec::new();
+        let layout = &self.niri.layout;
+
+        // Check for workspace changes.
+        let mut seen = HashSet::new();
+        let mut need_workspaces_changed = false;
+        for (mon, ws_idx, ws) in layout.workspaces() {
+            let id = u64::from(ws.id().0);
+            seen.insert(id);
+
+            let Some(ipc_ws) = state.workspaces.get(&id) else {
+                // A new workspace was added.
+                need_workspaces_changed = true;
+                break;
+            };
+
+            // Check for any changes other than the active workspace switch.
+            let output_name = mon.map(|mon| mon.output_name());
+            if ipc_ws.idx != u8::try_from(ws_idx + 1).unwrap_or(u8::MAX)
+                || ipc_ws.name != ws.name
+                || ipc_ws.output.as_ref() != output_name
+            {
+                need_workspaces_changed = true;
+                break;
+            }
+
+            // Check if this workspace became active. We don't check if a workspace became
+            // inactive, because this will be changed automatically.
+            let is_active = mon.map_or(false, |mon| mon.active_workspace_idx == ws_idx);
+            if is_active && !ipc_ws.is_active {
+                let output = output_name.cloned();
+                events.push(Event::WorkspaceSwitched { output, id });
+            }
+        }
+
+        // Check if any workspaces were removed.
+        if !need_workspaces_changed && state.workspaces.keys().any(|id| !seen.contains(id)) {
+            need_workspaces_changed = true;
+        }
+
+        if need_workspaces_changed {
+            events.clear();
+
+            let workspaces = layout
+                .workspaces()
+                .map(|(mon, ws_idx, ws)| Workspace {
+                    id: u64::from(ws.id().0),
+                    idx: u8::try_from(ws_idx + 1).unwrap_or(u8::MAX),
+                    name: ws.name.clone(),
+                    output: mon.map(|mon| mon.output_name().clone()),
+                    is_active: mon.map_or(false, |mon| mon.active_workspace_idx == ws_idx),
+                })
+                .collect();
+
+            events.push(Event::WorkspacesChanged { workspaces });
+        }
+
+        for event in events {
+            state.apply(event.clone());
+            server.send_event(event);
+        }
+    }
 }

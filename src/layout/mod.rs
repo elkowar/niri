@@ -2484,41 +2484,38 @@ impl<W: LayoutElement> Layout<W> {
         }
     }
 
-    pub fn ipc_workspaces(&self) -> Vec<niri_ipc::Workspace> {
+    pub fn workspaces(
+        &self,
+    ) -> impl Iterator<Item = (Option<&Monitor<W>>, usize, &Workspace<W>)> + '_ {
+        let iter_normal;
+        let iter_no_outputs;
+
         match &self.monitor_set {
-            MonitorSet::Normal {
-                monitors,
-                primary_idx: _,
-                active_monitor_idx: _,
-            } => {
-                let mut workspaces = Vec::new();
+            MonitorSet::Normal { monitors, .. } => {
+                let it = monitors.iter().flat_map(|mon| {
+                    mon.workspaces
+                        .iter()
+                        .enumerate()
+                        .map(move |(idx, ws)| (Some(mon), idx, ws))
+                });
 
-                for monitor in monitors {
-                    for (idx, workspace) in monitor.workspaces.iter().enumerate() {
-                        workspaces.push(niri_ipc::Workspace {
-                            id: u64::from(workspace.id().0),
-                            idx: u8::try_from(idx + 1).unwrap_or(u8::MAX),
-                            name: workspace.name.clone(),
-                            output: Some(monitor.output.name()),
-                            is_active: monitor.active_workspace_idx == idx,
-                        })
-                    }
-                }
-
-                workspaces
+                iter_normal = Some(it);
+                iter_no_outputs = None;
             }
-            MonitorSet::NoOutputs { workspaces } => workspaces
-                .iter()
-                .enumerate()
-                .map(|(idx, ws)| niri_ipc::Workspace {
-                    id: u64::from(ws.id().0),
-                    idx: u8::try_from(idx + 1).unwrap_or(u8::MAX),
-                    name: ws.name.clone(),
-                    output: None,
-                    is_active: false,
-                })
-                .collect(),
+            MonitorSet::NoOutputs { workspaces } => {
+                let it = workspaces
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, ws)| (None, idx, ws));
+
+                iter_normal = None;
+                iter_no_outputs = Some(it);
+            }
         }
+
+        let iter_normal = iter_normal.into_iter().flatten();
+        let iter_no_outputs = iter_no_outputs.into_iter().flatten();
+        iter_normal.chain(iter_no_outputs)
     }
 }
 

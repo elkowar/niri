@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 mod socket;
 pub use socket::{Socket, SOCKET_PATH_ENV};
 
+pub mod state;
+
 /// Request from client to niri.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -541,6 +543,8 @@ pub enum Transform {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Window {
+    /// Unique id of this window.
+    pub id: u64,
     /// Title, if set.
     pub title: Option<String>,
     /// Application ID, if set.
@@ -592,45 +596,47 @@ pub struct KeyboardLayouts {
 /// A compositor event.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Event {
-    /// A new workspace was created.
-    WorkspaceCreated {
-        /// The new workspace.
-        workspace: Workspace,
-    },
-    /// A workspace was removed.
-    WorkspaceRemoved {
-        /// Id of the removed workspace.
-        id: u64,
+    /// The workspace configuration has changed.
+    WorkspacesChanged {
+        /// The new workspace configuration.
+        workspaces: Vec<Workspace>,
     },
     /// A workspace was switched on an output.
     ///
     /// This doesn't mean the workspace became focused, just that it's now the active workspace on
-    /// its output.
+    /// its output. All other workspaces on the same output become inactive.
     WorkspaceSwitched {
         /// Output where the workspace was switched.
-        output: String,
+        ///
+        /// Can be `None` if no outputs are currently connected.
+        output: Option<String>,
         /// Id of the newly active workspace.
         id: u64,
     },
-    /// A workspace moved on an output or to a different output.
-    WorkspaceMoved {
-        /// Id of the moved workspace.
+    /// A new toplevel window was opened.
+    WindowOpened {
+        /// The new window.
+        window: Window,
+    },
+    /// A toplevel window was closed.
+    WindowClosed {
+        /// Id of the removed window.
         id: u64,
-        /// New output of the workspace.
-        output: String,
-        /// New position of the workspace on the output.
-        idx: u8,
     },
     /// Window focus changed.
     WindowFocused {
-        // FIXME: replace with id, and WindowCreated/Removed.
-        /// The newly focused window, or `None` if no window is now focused.
-        window: Option<Window>,
+        /// Id of the newly focused window, or `None` if no window is now focused.
+        id: Option<u64>,
     },
-    /// The keyboard layout changed.
-    KeyboardLayoutChanged {
-        /// Name of the newly active layout.
-        name: String,
+    /// The configured keyboard layouts have changed.
+    KeyboardLayoutsChanged {
+        /// The new keyboard layout configuration.
+        keyboard_layouts: KeyboardLayouts,
+    },
+    /// The keyboard layout switched.
+    KeyboardLayoutSwitched {
+        /// Index of the newly active layout.
+        idx: u8,
     },
 }
 
