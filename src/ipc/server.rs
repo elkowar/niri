@@ -239,7 +239,7 @@ async fn handle_client(ctx: ClientCtx, stream: Async<'static, UnixStream>) -> an
         // Send the initial state.
         {
             let state = ctx.event_stream_state.borrow();
-            for event in state.reproduce() {
+            for event in state.replicate() {
                 events_tx
                     .try_send(event)
                     .expect("initial event burst had more events than buffer size");

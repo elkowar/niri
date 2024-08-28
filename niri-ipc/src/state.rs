@@ -6,8 +6,8 @@ use crate::{Event, KeyboardLayouts, Workspace};
 
 /// Part of the state communicated via the event stream.
 pub trait EventStreamStatePart {
-    /// Returns a sequence of events that reproduce this state from default initialization.
-    fn reproduce(&self) -> Vec<Event>;
+    /// Returns a sequence of events that replicates this state from default initialization.
+    fn replicate(&self) -> Vec<Event>;
 
     /// Applies the event to this state.
     ///
@@ -41,10 +41,10 @@ pub struct KeyboardLayoutsState {
 }
 
 impl EventStreamStatePart for EventStreamState {
-    fn reproduce(&self) -> Vec<Event> {
+    fn replicate(&self) -> Vec<Event> {
         let mut events = Vec::new();
-        events.extend(self.workspaces.reproduce());
-        events.extend(self.keyboard_layouts.reproduce());
+        events.extend(self.workspaces.replicate());
+        events.extend(self.keyboard_layouts.replicate());
         events
     }
 
@@ -56,7 +56,7 @@ impl EventStreamStatePart for EventStreamState {
 }
 
 impl EventStreamStatePart for WorkspacesState {
-    fn reproduce(&self) -> Vec<Event> {
+    fn replicate(&self) -> Vec<Event> {
         let workspaces = self.workspaces.values().cloned().collect();
         vec![Event::WorkspacesChanged { workspaces }]
     }
@@ -82,7 +82,7 @@ impl EventStreamStatePart for WorkspacesState {
 }
 
 impl EventStreamStatePart for KeyboardLayoutsState {
-    fn reproduce(&self) -> Vec<Event> {
+    fn replicate(&self) -> Vec<Event> {
         if let Some(keyboard_layouts) = self.keyboard_layouts.clone() {
             vec![Event::KeyboardLayoutsChanged { keyboard_layouts }]
         } else {
