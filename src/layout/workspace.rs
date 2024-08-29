@@ -718,11 +718,17 @@ impl<W: LayoutElement> Workspace<W> {
         idx: usize,
         prev_idx: Option<usize>,
     ) -> f64 {
-        match self.options.center_focused_column {
-            CenterFocusedColumn::Always => {
+        match (
+            self.options.always_center_single_column,
+            self.options.center_focused_column,
+        ) {
+            (true, _) if self.columns.len() <= 1 => {
                 self.compute_new_view_offset_for_column_centered(current_x, idx)
             }
-            CenterFocusedColumn::OnOverflow => {
+            (_, CenterFocusedColumn::Always) => {
+                self.compute_new_view_offset_for_column_centered(current_x, idx)
+            }
+            (_, CenterFocusedColumn::OnOverflow) => {
                 let Some(prev_idx) = prev_idx else {
                     return self.compute_new_view_offset_for_column_fit(current_x, idx);
                 };
@@ -755,7 +761,7 @@ impl<W: LayoutElement> Workspace<W> {
                     self.compute_new_view_offset_for_column_centered(current_x, idx)
                 }
             }
-            CenterFocusedColumn::Never => {
+            (_, CenterFocusedColumn::Never) => {
                 self.compute_new_view_offset_for_column_fit(current_x, idx)
             }
         }

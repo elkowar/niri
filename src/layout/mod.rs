@@ -235,6 +235,7 @@ pub struct Options {
     pub focus_ring: niri_config::FocusRing,
     pub border: niri_config::Border,
     pub center_focused_column: CenterFocusedColumn,
+    pub always_center_single_column: bool,
     /// Column widths that `toggle_width()` switches between.
     pub preset_widths: Vec<ColumnWidth>,
     /// Initial width for new columns.
@@ -254,6 +255,7 @@ impl Default for Options {
             focus_ring: Default::default(),
             border: Default::default(),
             center_focused_column: Default::default(),
+            always_center_single_column: false,
             preset_widths: vec![
                 ColumnWidth::Proportion(1. / 3.),
                 ColumnWidth::Proportion(0.5),
@@ -296,6 +298,7 @@ impl Options {
             focus_ring: layout.focus_ring,
             border: layout.border,
             center_focused_column: layout.center_focused_column,
+            always_center_single_column: layout.always_center_single_column,
             preset_widths,
             default_width,
             animations: config.animations.clone(),
