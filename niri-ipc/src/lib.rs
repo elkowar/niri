@@ -580,7 +580,13 @@ pub struct Workspace {
     /// Can be `None` if no outputs are currently connected.
     pub output: Option<String>,
     /// Whether the workspace is currently active on its output.
+    ///
+    /// Every output has one active workspace, the one that is currently visible on that output.
     pub is_active: bool,
+    /// Whether the workspace is currently focused.
+    ///
+    /// There's only one focused workspace across all outputs.
+    pub is_focused: bool,
 }
 
 /// Configured keyboard layouts.
@@ -601,15 +607,21 @@ pub enum Event {
         /// The new workspace configuration.
         workspaces: Vec<Workspace>,
     },
-    /// A workspace was switched on an output.
+    /// A workspace was focused.
+    ///
+    /// This is now the single focused workspace. All other workspaces are no longer focused, but
+    /// they may remain active on their respective outputs.
+    ///
+    /// When a workspace becomes focused, it also becomes activated on its output.
+    WorkspaceFocused {
+        /// Id of the newly focused workspace.
+        id: u64,
+    },
+    /// A workspace was activated on an output.
     ///
     /// This doesn't mean the workspace became focused, just that it's now the active workspace on
     /// its output. All other workspaces on the same output become inactive.
-    WorkspaceSwitched {
-        /// Output where the workspace was switched.
-        ///
-        /// Can be `None` if no outputs are currently connected.
-        output: Option<String>,
+    WorkspaceActivated {
         /// Id of the newly active workspace.
         id: u64,
     },

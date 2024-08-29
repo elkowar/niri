@@ -285,8 +285,11 @@ pub fn handle_msg(msg: Msg, json: bool) -> anyhow::Result<()> {
                     Event::WorkspacesChanged { workspaces } => {
                         println!("Workspaces changed: {workspaces:?}");
                     }
-                    Event::WorkspaceSwitched { output, id } => {
-                        println!("Workspace switched on output {output:?}: {id}");
+                    Event::WorkspaceFocused { id } => {
+                        println!("Workspace focused: {id}");
+                    }
+                    Event::WorkspaceActivated { id } => {
+                        println!("Workspace activated: {id}");
                     }
                     Event::WindowOpened { window } => {
                         println!("Window opened: {window:?}");

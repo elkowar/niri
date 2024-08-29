@@ -428,6 +428,7 @@ impl State {
 
         let mut events = Vec::new();
         let layout = &self.niri.layout;
+        let focused_ws_id = layout.active_workspace().map(|ws| u64::from(ws.id().0));
 
         // Check for workspace changes.
         let mut seen = HashSet::new();
@@ -452,12 +453,20 @@ impl State {
                 break;
             }
 
+            // Check if this workspace became focused.
+            let is_focused = Some(id) == focused_ws_id;
+            if is_focused && !ipc_ws.is_focused {
+                events.push(Event::WorkspaceFocused { id });
+
+                // This will also make it the active workspace, so we can skip the check below.
+                continue;
+            }
+
             // Check if this workspace became active. We don't check if a workspace became
             // inactive, because this will be changed automatically.
             let is_active = mon.map_or(false, |mon| mon.active_workspace_idx == ws_idx);
             if is_active && !ipc_ws.is_active {
-                let output = output_name.cloned();
-                events.push(Event::WorkspaceSwitched { output, id });
+                events.push(Event::WorkspaceActivated { id });
             }
         }
 
@@ -471,12 +480,16 @@ impl State {
 
             let workspaces = layout
                 .workspaces()
-                .map(|(mon, ws_idx, ws)| Workspace {
-                    id: u64::from(ws.id().0),
-                    idx: u8::try_from(ws_idx + 1).unwrap_or(u8::MAX),
-                    name: ws.name.clone(),
-                    output: mon.map(|mon| mon.output_name().clone()),
-                    is_active: mon.map_or(false, |mon| mon.active_workspace_idx == ws_idx),
+                .map(|(mon, ws_idx, ws)| {
+                    let id = u64::from(ws.id().0);
+                    Workspace {
+                        id,
+                        idx: u8::try_from(ws_idx + 1).unwrap_or(u8::MAX),
+                        name: ws.name.clone(),
+                        output: mon.map(|mon| mon.output_name().clone()),
+                        is_active: mon.map_or(false, |mon| mon.active_workspace_idx == ws_idx),
+                        is_focused: Some(id) == focused_ws_id,
+                    }
                 })
                 .collect();
 

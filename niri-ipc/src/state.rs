@@ -66,13 +66,28 @@ impl EventStreamStatePart for WorkspacesState {
             Event::WorkspacesChanged { workspaces } => {
                 self.workspaces = workspaces.into_iter().map(|ws| (ws.id, ws)).collect();
             }
-            Event::WorkspaceSwitched { output, id } => {
+            Event::WorkspaceFocused { id } => {
+                let ws = self.workspaces.get(&id);
+                let ws = ws.expect("focused workspace was missing from the map");
+                let output = ws.output.clone();
+
                 for ws in self.workspaces.values_mut() {
-                    if ws.output != output {
-                        continue;
+                    if ws.output == output {
+                        ws.is_active = ws.id == id;
                     }
 
-                    ws.is_active = ws.id == id;
+                    ws.is_focused = ws.id == id;
+                }
+            }
+            Event::WorkspaceActivated { id } => {
+                let ws = self.workspaces.get(&id);
+                let ws = ws.expect("activated workspace was missing from the map");
+                let output = ws.output.clone();
+
+                for ws in self.workspaces.values_mut() {
+                    if ws.output == output {
+                        ws.is_active = ws.id == id;
+                    }
                 }
             }
             event => return Some(event),
