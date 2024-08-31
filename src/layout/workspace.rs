@@ -2664,6 +2664,16 @@ impl<W: LayoutElement> Workspace<W> {
         true
     }
 
+    pub fn scroll_viewport(&mut self, amount: f64) {
+        // self.view_offset_gesture_begin(false);
+        // self.view_offset_gesture_update(
+        //     amount as f64,
+        //     std::time::UNIX_EPOCH.elapsed().unwrap(),
+        //     false,
+        // );
+        // self.view_offset_gesture_end(false, None);
+    }
+
     pub fn interactive_resize_begin(&mut self, window: W::Id, edges: ResizeEdge) -> bool {
         let col = self
             .columns

@@ -275,6 +275,19 @@ pub enum Action {
     MoveWorkspaceToMonitorDown,
     /// Move the focused workspace to the monitor above.
     MoveWorkspaceToMonitorUp,
+
+    /// Scroll the viewport to the left.
+    ScrollViewportLeft {
+        /// Fraction of the viewport size to scroll by.
+        #[cfg_attr(feature = "clap", arg())]
+        amount: f32,
+    },
+    /// Scroll the viewport to the right.
+    ScrollViewportRight {
+        /// Fraction of the viewport size to scroll by.
+        #[cfg_attr(feature = "clap", arg())]
+        amount: f32,
+    },
     /// Toggle a debug tint on windows.
     ToggleDebugTint,
     /// Toggle visualization of render element opaque regions.
