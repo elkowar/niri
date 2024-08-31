@@ -389,7 +389,7 @@ pub struct Layout {
     pub default_column_width: Option<DefaultColumnWidth>,
     #[knuffel(child, unwrap(argument), default)]
     pub center_focused_column: CenterFocusedColumn,
-    #[knuffel(child, unwrap(argument), default = false)]
+    #[knuffel(child)]
     pub always_center_single_column: bool,
     #[knuffel(child, unwrap(argument), default = Self::default().gaps)]
     pub gaps: FloatOrInt<0, 65535>,
