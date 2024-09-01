@@ -1077,11 +1077,11 @@ impl State {
                     }
                 }
             }
-            Action::ScrollViewportLeft(amount) => {
-                self.niri.layout.scroll_viewport(-amount);
+            Action::ScrollViewportLeft => {
+                self.niri.layout.scroll_viewport_left();
             }
-            Action::ScrollViewportRight(amount) => {
-                self.niri.layout.scroll_viewport(amount);
+            Action::ScrollViewportRight => {
+                self.niri.layout.scroll_viewport_right();
             }
         }
     }

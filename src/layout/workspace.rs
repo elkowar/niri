@@ -2664,14 +2664,53 @@ impl<W: LayoutElement> Workspace<W> {
         true
     }
 
-    pub fn scroll_viewport(&mut self, amount: f64) {
-        // self.view_offset_gesture_begin(false);
-        // self.view_offset_gesture_update(
-        //     amount as f64,
-        //     std::time::UNIX_EPOCH.elapsed().unwrap(),
-        //     false,
-        // );
-        // self.view_offset_gesture_end(false, None);
+    pub fn last_fully_visible_column(&mut self) -> Option<usize> {
+        for col_idx in (0..self.columns.len()).rev() {
+            if self.column_x(col_idx) + self.columns[col_idx].width()
+                <= self.view_pos() + self.view_size().w
+            {
+                return Some(col_idx);
+            }
+        }
+        return None;
+    }
+
+    // pub fn scroll_into_view(&mut self, col_idx: usize) {
+    //     let current_x = self.view_pos();
+
+    //     let new_view_offset = self.compute_new_view_offset_for_column_fit(self.view_pos(), col_idx);
+    //     self.animate_view_offset(current_x, col_idx, new_view_offset);
+    // }
+
+    pub fn scroll_viewport_left(&mut self) {
+        // if self.active_column_idx > 0 {
+        // self.scroll_into_view(self.active_column_idx - 1);
+        // }
+    }
+    pub fn scroll_viewport_right(&mut self) {
+        let Some(last_visible) = self.last_fully_visible_column() else {
+            return;
+        };
+        if last_visible + 1 < self.columns.len() {
+            let new_right_edge = self.column_x(last_visible + 1)
+                + self.columns[last_visible + 1].width()
+                + self.options.gaps;
+            let new_left_edge = new_right_edge - self.view_size().w;
+
+            let should_refocus = new_left_edge > self.column_x(self.active_column_idx);
+
+            self.animate_view_offset(
+                self.view_pos(),
+                self.active_column_idx,
+                new_right_edge - self.view_size().w,
+            );
+            if should_refocus {
+                self.active_column_idx += 1;
+                self.activate_prev_column_on_removal = None;
+                self.view_offset_before_fullscreen = None;
+                self.interactive_resize = None;
+            }
+        }
     }
 
     pub fn interactive_resize_begin(&mut self, window: W::Id, edges: ResizeEdge) -> bool {

@@ -1135,8 +1135,8 @@ pub enum Action {
     MoveWorkspaceToMonitorRight,
     MoveWorkspaceToMonitorDown,
     MoveWorkspaceToMonitorUp,
-    ScrollViewportRight(#[knuffel(property(name = "amount"))] f32),
-    ScrollViewportLeft(#[knuffel(property(name = "amount"))] f32),
+    ScrollViewportRight,
+    ScrollViewportLeft,
 }
 
 impl From<niri_ipc::Action> for Action {
@@ -1230,8 +1230,8 @@ impl From<niri_ipc::Action> for Action {
             niri_ipc::Action::MoveWorkspaceToMonitorDown => Self::MoveWorkspaceToMonitorDown,
             niri_ipc::Action::MoveWorkspaceToMonitorUp => Self::MoveWorkspaceToMonitorUp,
 
-            niri_ipc::Action::ScrollViewportLeft { amount } => Self::ScrollViewportLeft(amount),
-            niri_ipc::Action::ScrollViewportRight { amount } => Self::ScrollViewportRight(amount),
+            niri_ipc::Action::ScrollViewportLeft => Self::ScrollViewportLeft,
+            niri_ipc::Action::ScrollViewportRight => Self::ScrollViewportRight,
 
             niri_ipc::Action::ToggleDebugTint => Self::ToggleDebugTint,
             niri_ipc::Action::DebugToggleOpaqueRegions => Self::DebugToggleOpaqueRegions,
