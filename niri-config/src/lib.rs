@@ -1135,9 +1135,10 @@ pub enum Action {
     MoveWorkspaceToMonitorRight,
     MoveWorkspaceToMonitorDown,
     MoveWorkspaceToMonitorUp,
-    ScrollViewportRightDiscrete,
-    ScrollViewportLeftDiscrete,
-    ScrollViewportBy(#[knuffel(property(name = "amount"))] f64),
+    ScrollViewportRightByColumn,
+    ScrollViewportLeftByColumn,
+    ScrollViewportLeftByFraction(#[knuffel(property(name = "amount"))] f64),
+    ScrollViewportRightByFraction(#[knuffel(property(name = "amount"))] f64),
 }
 
 impl From<niri_ipc::Action> for Action {
@@ -1231,9 +1232,14 @@ impl From<niri_ipc::Action> for Action {
             niri_ipc::Action::MoveWorkspaceToMonitorDown => Self::MoveWorkspaceToMonitorDown,
             niri_ipc::Action::MoveWorkspaceToMonitorUp => Self::MoveWorkspaceToMonitorUp,
 
-            niri_ipc::Action::ScrollViewportLeftDiscrete => Self::ScrollViewportLeftDiscrete,
-            niri_ipc::Action::ScrollViewportRightDiscrete => Self::ScrollViewportRightDiscrete,
-            niri_ipc::Action::ScrollViewportBy { amount } => Self::ScrollViewportBy(amount),
+            niri_ipc::Action::ScrollViewportLeftByColumn => Self::ScrollViewportLeftByColumn,
+            niri_ipc::Action::ScrollViewportRightByColumn => Self::ScrollViewportRightByColumn,
+            niri_ipc::Action::ScrollViewportLeftByFraction { amount } => {
+                Self::ScrollViewportLeftByFraction(amount)
+            }
+            niri_ipc::Action::ScrollViewportRightByFraction { amount } => {
+                Self::ScrollViewportLeftByFraction(amount)
+            }
 
             niri_ipc::Action::ToggleDebugTint => Self::ToggleDebugTint,
             niri_ipc::Action::DebugToggleOpaqueRegions => Self::DebugToggleOpaqueRegions,

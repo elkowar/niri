@@ -1077,14 +1077,17 @@ impl State {
                     }
                 }
             }
-            Action::ScrollViewportLeftDiscrete => {
-                self.niri.layout.scroll_viewport_left_discrete();
+            Action::ScrollViewportLeftByColumn => {
+                self.niri.layout.scroll_viewport_left_by_column();
             }
-            Action::ScrollViewportRightDiscrete => {
-                self.niri.layout.scroll_viewport_right_discrete();
+            Action::ScrollViewportRightByColumn => {
+                self.niri.layout.scroll_viewport_right_by_column();
             }
-            Action::ScrollViewportBy(amount) => {
-                self.niri.layout.scroll_viewport(amount);
+            Action::ScrollViewportLeftByFraction(amount) => {
+                self.niri.layout.scroll_viewport_by_fraction(-amount);
+            }
+            Action::ScrollViewportRightByFraction(amount) => {
+                self.niri.layout.scroll_viewport_by_fraction(amount);
             }
         }
     }

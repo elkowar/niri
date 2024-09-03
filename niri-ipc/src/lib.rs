@@ -277,12 +277,17 @@ pub enum Action {
     MoveWorkspaceToMonitorUp,
 
     /// Scroll the viewport to the left by one column.
-    ScrollViewportLeftDiscrete,
+    ScrollViewportLeftByColumn,
     /// Scroll the viewport to the right by one column.
-    ScrollViewportRightDiscrete,
-    /// Scroll the viewport by a given portion of the viewport.
-    /// Provide a negative value to scroll leftwards.
-    ScrollViewportBy {
+    ScrollViewportRightByColumn,
+    /// Scroll the viewport left by a given portion of the viewport.
+    ScrollViewportLeftByFraction {
+        /// Portion of the viewport to scroll by
+        #[cfg_attr(feature = "clap", arg(long))]
+        amount: f64,
+    },
+    /// Scroll the viewport right by a given portion of the viewport.
+    ScrollViewportRightByFraction {
         /// Portion of the viewport to scroll by
         #[cfg_attr(feature = "clap", arg(long))]
         amount: f64,

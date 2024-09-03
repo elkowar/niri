@@ -2261,7 +2261,7 @@ impl<W: LayoutElement> Layout<W> {
         None
     }
 
-    pub fn scroll_viewport_left_discrete(&mut self) {
+    pub fn scroll_viewport_left_by_column(&mut self) {
         let monitors = match &mut self.monitor_set {
             MonitorSet::Normal { monitors, .. } => monitors,
             MonitorSet::NoOutputs { .. } => return,
@@ -2274,7 +2274,7 @@ impl<W: LayoutElement> Layout<W> {
         }
     }
 
-    pub fn scroll_viewport_right_discrete(&mut self) {
+    pub fn scroll_viewport_right_by_column(&mut self) {
         let monitors = match &mut self.monitor_set {
             MonitorSet::Normal { monitors, .. } => monitors,
             MonitorSet::NoOutputs { .. } => return,
@@ -2287,7 +2287,7 @@ impl<W: LayoutElement> Layout<W> {
         }
     }
 
-    pub fn scroll_viewport(&mut self, amount: f64) {
+    pub fn scroll_viewport_by_fraction(&mut self, amount: f64) {
         let monitors = match &mut self.monitor_set {
             MonitorSet::Normal { monitors, .. } => monitors,
             MonitorSet::NoOutputs { .. } => return,
@@ -2295,7 +2295,7 @@ impl<W: LayoutElement> Layout<W> {
 
         for monitor in monitors {
             for ws in &mut monitor.workspaces {
-                ws.scroll_viewport(amount);
+                ws.scroll_viewport_by_fraction(amount);
             }
         }
     }
