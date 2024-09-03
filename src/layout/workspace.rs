@@ -2664,52 +2664,91 @@ impl<W: LayoutElement> Workspace<W> {
         true
     }
 
-    pub fn last_fully_visible_column(&mut self) -> Option<usize> {
-        for col_idx in (0..self.columns.len()).rev() {
-            if self.column_x(col_idx) + self.columns[col_idx].width()
-                <= self.view_pos() + self.view_size().w
-            {
-                return Some(col_idx);
-            }
-        }
-        return None;
+    pub fn fully_visible_columns(&self) -> impl Iterator<Item = usize> + '_ {
+        let view_pos = self.view_pos();
+        let view_width = self.view_size().w;
+        (0..self.columns.len())
+            .skip_while(move |&col| self.column_x(col) < view_pos)
+            .take_while(move |&col| {
+                self.column_x(col) + self.columns[col].width() <= view_pos + view_width
+            })
     }
-
-    // pub fn scroll_into_view(&mut self, col_idx: usize) {
-    //     let current_x = self.view_pos();
-
-    //     let new_view_offset = self.compute_new_view_offset_for_column_fit(self.view_pos(), col_idx);
-    //     self.animate_view_offset(current_x, col_idx, new_view_offset);
-    // }
 
     pub fn scroll_viewport_left(&mut self) {
-        // if self.active_column_idx > 0 {
-        // self.scroll_into_view(self.active_column_idx - 1);
-        // }
-    }
-    pub fn scroll_viewport_right(&mut self) {
-        let Some(last_visible) = self.last_fully_visible_column() else {
+        let Some(first_visible) = self.fully_visible_columns().next() else {
             return;
         };
-        if last_visible + 1 < self.columns.len() {
-            let new_right_edge = self.column_x(last_visible + 1)
-                + self.columns[last_visible + 1].width()
-                + self.options.gaps;
-            let new_left_edge = new_right_edge - self.view_size().w;
+        if first_visible == 0 {
+            return;
+        }
+        let new_left_edge = self.column_x(first_visible - 1) - self.options.gaps;
+        let new_right_edge = new_left_edge + self.view_size().w;
 
-            let should_refocus = new_left_edge > self.column_x(self.active_column_idx);
+        let should_refocus = new_right_edge
+            < self.column_x(self.active_column_idx) + self.columns[self.active_column_idx].width();
 
+        if should_refocus {
+            let mut new_focused = self.active_column_idx - 1;
+            for col_idx in (0..self.columns.len()).rev() {
+                if self.column_x(col_idx) + self.columns[col_idx].width() + self.options.gaps
+                    <= new_right_edge
+                {
+                    new_focused = col_idx;
+                    break;
+                }
+            }
+            self.animate_view_offset(
+                self.view_pos(),
+                new_focused,
+                new_left_edge - self.column_x(new_focused),
+            );
+            self.active_column_idx = new_focused;
+            self.activate_prev_column_on_removal = None;
+            self.view_offset_before_fullscreen = None;
+            self.interactive_resize = None;
+        } else {
             self.animate_view_offset(
                 self.view_pos(),
                 self.active_column_idx,
-                new_right_edge - self.view_size().w,
+                new_left_edge - self.column_x(self.active_column_idx),
             );
-            if should_refocus {
-                self.active_column_idx += 1;
-                self.activate_prev_column_on_removal = None;
-                self.view_offset_before_fullscreen = None;
-                self.interactive_resize = None;
-            }
+        }
+    }
+
+    pub fn scroll_viewport_right(&mut self) {
+        let Some(last_visible) = self.fully_visible_columns().last() else {
+            return;
+        };
+        if last_visible + 1 >= self.columns.len() {
+            return;
+        }
+        let new_right_edge = self.column_x(last_visible + 1)
+            + self.columns[last_visible + 1].width()
+            + self.options.gaps;
+        let new_left_edge = new_right_edge - self.view_size().w;
+        if new_left_edge > self.column_x(self.active_column_idx) {
+            let new_focused = self
+                .column_xs(self.data.iter().copied())
+                .enumerate()
+                .find(|(_, x)| *x > new_left_edge)
+                .map(|(idx, _)| idx)
+                .unwrap_or(self.active_column_idx + 1);
+
+            self.animate_view_offset(
+                self.view_pos(),
+                new_focused,
+                new_left_edge - self.column_x(new_focused),
+            );
+            self.active_column_idx = new_focused;
+            self.activate_prev_column_on_removal = None;
+            self.view_offset_before_fullscreen = None;
+            self.interactive_resize = None;
+        } else {
+            self.animate_view_offset(
+                self.view_pos(),
+                self.active_column_idx,
+                new_left_edge - self.column_x(self.active_column_idx),
+            );
         }
     }
 
