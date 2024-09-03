@@ -1,4 +1,4 @@
-use std::cmp::{max, min};
+use std::cmp::{max, min, min_by_key};
 use std::iter::{self, zip};
 use std::rc::Rc;
 use std::time::Duration;
@@ -2721,46 +2721,73 @@ impl<W: LayoutElement> Workspace<W> {
         }
     }
 
-    pub fn scroll_viewport_left_discrete(&mut self, target_biased: bool) {
-        let target_view_pos = if target_biased {
-            let Some(first_visible) = self.fully_visible_columns().next() else {
-                return;
-            };
-            if first_visible == 0 {
-                return;
-            }
-            self.column_x(first_visible - 1) - self.options.gaps
-        } else {
-            let Some(last_visible) = self.fully_visible_columns().last() else {
-                return;
-            };
-            if last_visible == 0 {
-                return;
-            }
-            let new_right_edge = self.right_column_edge(last_visible - 1) + self.options.gaps;
-            new_right_edge - self.view_size().w
+    pub fn scroll_viewport_left_discrete(&mut self) {
+        let mut visible_columns = self.fully_visible_columns();
+        let Some(first_visible) = visible_columns.next() else {
+            return;
         };
+        let last_visible = visible_columns.last().unwrap_or(first_visible);
+
+        let shifted_by_left_side = if first_visible != 0 {
+            Some(self.column_x(first_visible - 1) - self.options.gaps)
+        } else {
+            None
+        };
+
+        let shifted_by_right_side = if last_visible != 0 {
+            let new_right_edge = self.right_column_edge(last_visible - 1) + self.options.gaps;
+            Some(new_right_edge - self.view_size().w)
+        } else {
+            None
+        };
+
+        let target_view_pos = if let Some((a, b)) = shifted_by_left_side.zip(shifted_by_right_side)
+        {
+            if (a - self.view_pos()).abs() < (b - self.view_pos()).abs() {
+                Some(a)
+            } else {
+                Some(b)
+            }
+        } else {
+            shifted_by_left_side.or(shifted_by_right_side)
+        };
+        let Some(target_view_pos) = target_view_pos else {
+            return;
+        };
+
         self.scroll_viewport_to(target_view_pos);
     }
 
-    pub fn scroll_viewport_right_discrete(&mut self, target_biased: bool) {
-        let target_view_pos = if target_biased {
-            let Some(last_visible) = self.fully_visible_columns().last() else {
-                return;
-            };
-            if last_visible + 1 >= self.columns.len() {
-                return;
-            }
+    pub fn scroll_viewport_right_discrete(&mut self) {
+        let mut visible_columns = self.fully_visible_columns();
+        let Some(first_visible) = visible_columns.next() else {
+            return;
+        };
+        let last_visible = visible_columns.last().unwrap_or(first_visible);
+        let shifted_by_right_side = if last_visible + 1 < self.columns.len() {
             let new_right_edge = self.right_column_edge(last_visible + 1) + self.options.gaps;
-            new_right_edge - self.view_size().w
+            Some(new_right_edge - self.view_size().w)
         } else {
-            let Some(first_visible) = self.fully_visible_columns().next() else {
-                return;
-            };
-            if first_visible == self.columns.len() - 1 {
-                return;
+            None
+        };
+
+        let shifted_by_left_side = if first_visible < self.columns.len() - 1 {
+            Some(self.column_x(first_visible + 1) - self.options.gaps)
+        } else {
+            None
+        };
+        let target_view_pos = if let Some((a, b)) = shifted_by_left_side.zip(shifted_by_right_side)
+        {
+            if (a - self.view_pos()).abs() < (b - self.view_pos()).abs() {
+                Some(a)
+            } else {
+                Some(b)
             }
-            self.column_x(first_visible + 1) - self.options.gaps
+        } else {
+            shifted_by_left_side.or(shifted_by_right_side)
+        };
+        let Some(target_view_pos) = target_view_pos else {
+            return;
         };
         self.scroll_viewport_to(target_view_pos);
     }

@@ -277,19 +277,9 @@ pub enum Action {
     MoveWorkspaceToMonitorUp,
 
     /// Scroll the viewport to the left by one column.
-    ScrollViewportLeftDiscrete {
-        /// If true, will try to scroll until the next window to the left is fully visible.
-        /// Otherwise, will scroll until the last visible window is outside the viewport.
-        #[cfg_attr(feature = "clap", arg(long))]
-        target_biased: bool,
-    },
+    ScrollViewportLeftDiscrete,
     /// Scroll the viewport to the right by one column.
-    ScrollViewportRightDiscrete {
-        /// If true, will try to scroll until the next window to the right is fully visible.
-        /// Otherwise, will scroll until the first visible window is outside the viewport.
-        #[cfg_attr(feature = "clap", arg(long))]
-        target_biased: bool,
-    },
+    ScrollViewportRightDiscrete,
     /// Scroll the viewport by a given portion of the viewport.
     /// Provide a negative value to scroll leftwards.
     ScrollViewportBy {

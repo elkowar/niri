@@ -1077,15 +1077,11 @@ impl State {
                     }
                 }
             }
-            Action::ScrollViewportLeftDiscrete(target_biased) => {
-                self.niri
-                    .layout
-                    .scroll_viewport_left_discrete(target_biased);
+            Action::ScrollViewportLeftDiscrete => {
+                self.niri.layout.scroll_viewport_left_discrete();
             }
-            Action::ScrollViewportRightDiscrete(target_biased) => {
-                self.niri
-                    .layout
-                    .scroll_viewport_right_discrete(target_biased);
+            Action::ScrollViewportRightDiscrete => {
+                self.niri.layout.scroll_viewport_right_discrete();
             }
             Action::ScrollViewportBy(amount) => {
                 self.niri.layout.scroll_viewport(amount);
