@@ -2763,7 +2763,7 @@ impl<W: LayoutElement> Workspace<W> {
     }
 
     pub fn scroll_viewport(&mut self, amount: f64) {
-        self.scroll_viewport_to(self.view_pos() + amount);
+        self.scroll_viewport_to(self.view_pos() + amount * self.view_size().w);
     }
 
     pub fn interactive_resize_begin(&mut self, window: W::Id, edges: ResizeEdge) -> bool {
