@@ -281,17 +281,6 @@ pub enum Action {
     /// Scroll the viewport to the right by one column.
     ScrollViewportRightByColumn,
     /// Scroll the viewport left by a given portion of the viewport.
-    ScrollViewportLeftByFraction {
-        /// Portion of the viewport to scroll by
-        #[cfg_attr(feature = "clap", arg(long))]
-        amount: f64,
-    },
-    /// Scroll the viewport right by a given portion of the viewport.
-    ScrollViewportRightByFraction {
-        /// Portion of the viewport to scroll by
-        #[cfg_attr(feature = "clap", arg(long))]
-        amount: f64,
-    },
     /// Toggle a debug tint on windows.
     ToggleDebugTint,
     /// Toggle visualization of render element opaque regions.

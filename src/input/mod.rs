@@ -1083,12 +1083,6 @@ impl State {
             Action::ScrollViewportRightByColumn => {
                 self.niri.layout.scroll_viewport_right_by_column();
             }
-            Action::ScrollViewportLeftByFraction(amount) => {
-                self.niri.layout.scroll_viewport_by_fraction(-amount);
-            }
-            Action::ScrollViewportRightByFraction(amount) => {
-                self.niri.layout.scroll_viewport_by_fraction(amount);
-            }
         }
     }
 

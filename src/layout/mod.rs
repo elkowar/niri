@@ -2287,19 +2287,6 @@ impl<W: LayoutElement> Layout<W> {
         }
     }
 
-    pub fn scroll_viewport_by_fraction(&mut self, amount: f64) {
-        let monitors = match &mut self.monitor_set {
-            MonitorSet::Normal { monitors, .. } => monitors,
-            MonitorSet::NoOutputs { .. } => return,
-        };
-
-        for monitor in monitors {
-            for ws in &mut monitor.workspaces {
-                ws.scroll_viewport_by_fraction(amount);
-            }
-        }
-    }
-
     pub fn interactive_resize_begin(&mut self, window: W::Id, edges: ResizeEdge) -> bool {
         match &mut self.monitor_set {
             MonitorSet::Normal { monitors, .. } => {

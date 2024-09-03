@@ -1137,8 +1137,6 @@ pub enum Action {
     MoveWorkspaceToMonitorUp,
     ScrollViewportRightByColumn,
     ScrollViewportLeftByColumn,
-    ScrollViewportLeftByFraction(#[knuffel(property(name = "amount"))] f64),
-    ScrollViewportRightByFraction(#[knuffel(property(name = "amount"))] f64),
 }
 
 impl From<niri_ipc::Action> for Action {
@@ -1234,12 +1232,6 @@ impl From<niri_ipc::Action> for Action {
 
             niri_ipc::Action::ScrollViewportLeftByColumn => Self::ScrollViewportLeftByColumn,
             niri_ipc::Action::ScrollViewportRightByColumn => Self::ScrollViewportRightByColumn,
-            niri_ipc::Action::ScrollViewportLeftByFraction { amount } => {
-                Self::ScrollViewportLeftByFraction(amount)
-            }
-            niri_ipc::Action::ScrollViewportRightByFraction { amount } => {
-                Self::ScrollViewportLeftByFraction(amount)
-            }
 
             niri_ipc::Action::ToggleDebugTint => Self::ToggleDebugTint,
             niri_ipc::Action::DebugToggleOpaqueRegions => Self::DebugToggleOpaqueRegions,
