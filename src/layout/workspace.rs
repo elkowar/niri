@@ -2676,33 +2676,41 @@ impl<W: LayoutElement> Workspace<W> {
             .take_while(move |&col| self.right_column_edge(col) <= view_pos + view_width)
     }
 
-    pub fn scroll_viewport_left(&mut self) {
-        let Some(first_visible) = self.fully_visible_columns().next() else {
-            return;
-        };
-        if first_visible == 0 {
-            return;
-        }
-        let new_left_edge = self.column_x(first_visible - 1) - self.options.gaps;
-        let new_right_edge = new_left_edge + self.view_size().w;
+    /// Scroll the viewport to the given target view position.
+    /// If necessary, the active column is changed to ensure that the focus stays inside the viewport.
+    pub fn scroll_viewport_to(&mut self, target_view_pos: f64) {
+        let target_right_edge = target_view_pos + self.view_size().w;
 
-        let new_focused = if new_right_edge
-            >= self.right_column_edge(self.active_column_idx) + self.options.gaps
-        {
-            self.active_column_idx
+        let new_focused = if target_view_pos < self.view_pos() {
+            if target_right_edge
+                >= self.right_column_edge(self.active_column_idx) + self.options.gaps
+            {
+                self.active_column_idx
+            } else {
+                (0..self.columns.len())
+                    .rev()
+                    .find(|&col_idx| {
+                        self.right_column_edge(col_idx) + self.options.gaps <= target_right_edge
+                    })
+                    .unwrap_or(self.active_column_idx)
+            }
         } else {
-            (0..self.columns.len())
-                .rev()
-                .find(|&col_idx| {
-                    self.right_column_edge(col_idx) + self.options.gaps <= new_right_edge
-                })
-                .unwrap_or(self.active_column_idx)
+            if target_view_pos <= self.column_x(self.active_column_idx) {
+                self.active_column_idx
+            } else {
+                self.column_xs(self.data.iter().copied())
+                    .enumerate()
+                    .find(|(_, x)| *x > target_view_pos)
+                    .map(|(idx, _)| idx)
+                    .unwrap_or(self.active_column_idx)
+            }
         };
+        log::info!("Scrolling to {target_view_pos} and focussing {new_focused}");
 
         self.animate_view_offset(
             self.view_pos(),
             new_focused,
-            new_left_edge - self.column_x(new_focused),
+            target_view_pos - self.column_x(new_focused),
         );
 
         if new_focused != self.active_column_idx {
@@ -2713,38 +2721,52 @@ impl<W: LayoutElement> Workspace<W> {
         }
     }
 
-    pub fn scroll_viewport_right(&mut self) {
-        let Some(last_visible) = self.fully_visible_columns().last() else {
-            return;
-        };
-        if last_visible + 1 >= self.columns.len() {
-            return;
-        }
-        let new_right_edge = self.right_column_edge(last_visible + 1) + self.options.gaps;
-        let new_left_edge = new_right_edge - self.view_size().w;
-
-        let new_focused = if new_left_edge <= self.column_x(self.active_column_idx) {
-            self.active_column_idx
+    pub fn scroll_viewport_left_discrete(&mut self, target_biased: bool) {
+        let target_view_pos = if target_biased {
+            let Some(first_visible) = self.fully_visible_columns().next() else {
+                return;
+            };
+            if first_visible == 0 {
+                return;
+            }
+            self.column_x(first_visible - 1) - self.options.gaps
         } else {
-            self.column_xs(self.data.iter().copied())
-                .enumerate()
-                .find(|(_, x)| *x > new_left_edge)
-                .map(|(idx, _)| idx)
-                .unwrap_or(self.active_column_idx + 1)
+            let Some(last_visible) = self.fully_visible_columns().last() else {
+                return;
+            };
+            if last_visible == 0 {
+                return;
+            }
+            let new_right_edge = self.right_column_edge(last_visible - 1) + self.options.gaps;
+            new_right_edge - self.view_size().w
         };
+        self.scroll_viewport_to(target_view_pos);
+    }
 
-        self.animate_view_offset(
-            self.view_pos(),
-            new_focused,
-            new_left_edge - self.column_x(new_focused),
-        );
+    pub fn scroll_viewport_right_discrete(&mut self, target_biased: bool) {
+        let target_view_pos = if target_biased {
+            let Some(last_visible) = self.fully_visible_columns().last() else {
+                return;
+            };
+            if last_visible + 1 >= self.columns.len() {
+                return;
+            }
+            let new_right_edge = self.right_column_edge(last_visible + 1) + self.options.gaps;
+            new_right_edge - self.view_size().w
+        } else {
+            let Some(first_visible) = self.fully_visible_columns().next() else {
+                return;
+            };
+            if first_visible == self.columns.len() - 1 {
+                return;
+            }
+            self.column_x(first_visible + 1) - self.options.gaps
+        };
+        self.scroll_viewport_to(target_view_pos);
+    }
 
-        if self.active_column_idx != new_focused {
-            self.active_column_idx = new_focused;
-            self.activate_prev_column_on_removal = None;
-            self.view_offset_before_fullscreen = None;
-            self.interactive_resize = None;
-        }
+    pub fn scroll_viewport(&mut self, amount: f64) {
+        self.scroll_viewport_to(self.view_pos() + amount);
     }
 
     pub fn interactive_resize_begin(&mut self, window: W::Id, edges: ResizeEdge) -> bool {

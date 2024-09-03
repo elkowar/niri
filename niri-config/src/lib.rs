@@ -1135,8 +1135,9 @@ pub enum Action {
     MoveWorkspaceToMonitorRight,
     MoveWorkspaceToMonitorDown,
     MoveWorkspaceToMonitorUp,
-    ScrollViewportRight,
-    ScrollViewportLeft,
+    ScrollViewportRightDiscrete(#[knuffel(property(name = "target-biased"))] bool),
+    ScrollViewportLeftDiscrete(#[knuffel(property(name = "target-biased"))] bool),
+    ScrollViewportBy(#[knuffel(property(name = "amount"))] f64),
 }
 
 impl From<niri_ipc::Action> for Action {
@@ -1230,8 +1231,13 @@ impl From<niri_ipc::Action> for Action {
             niri_ipc::Action::MoveWorkspaceToMonitorDown => Self::MoveWorkspaceToMonitorDown,
             niri_ipc::Action::MoveWorkspaceToMonitorUp => Self::MoveWorkspaceToMonitorUp,
 
-            niri_ipc::Action::ScrollViewportLeft => Self::ScrollViewportLeft,
-            niri_ipc::Action::ScrollViewportRight => Self::ScrollViewportRight,
+            niri_ipc::Action::ScrollViewportLeftDiscrete { target_biased } => {
+                Self::ScrollViewportLeftDiscrete(target_biased)
+            }
+            niri_ipc::Action::ScrollViewportRightDiscrete { target_biased } => {
+                Self::ScrollViewportRightDiscrete(target_biased)
+            }
+            niri_ipc::Action::ScrollViewportBy { amount } => Self::ScrollViewportBy(amount),
 
             niri_ipc::Action::ToggleDebugTint => Self::ToggleDebugTint,
             niri_ipc::Action::DebugToggleOpaqueRegions => Self::DebugToggleOpaqueRegions,

@@ -2261,7 +2261,7 @@ impl<W: LayoutElement> Layout<W> {
         None
     }
 
-    pub fn scroll_viewport_left(&mut self) {
+    pub fn scroll_viewport_left_discrete(&mut self, target_biased: bool) {
         let monitors = match &mut self.monitor_set {
             MonitorSet::Normal { monitors, .. } => monitors,
             MonitorSet::NoOutputs { .. } => return,
@@ -2269,12 +2269,12 @@ impl<W: LayoutElement> Layout<W> {
 
         for monitor in monitors {
             for ws in &mut monitor.workspaces {
-                ws.scroll_viewport_left();
+                ws.scroll_viewport_left_discrete(target_biased);
             }
         }
     }
 
-    pub fn scroll_viewport_right(&mut self) {
+    pub fn scroll_viewport_right_discrete(&mut self, target_biased: bool) {
         let monitors = match &mut self.monitor_set {
             MonitorSet::Normal { monitors, .. } => monitors,
             MonitorSet::NoOutputs { .. } => return,
@@ -2282,7 +2282,20 @@ impl<W: LayoutElement> Layout<W> {
 
         for monitor in monitors {
             for ws in &mut monitor.workspaces {
-                ws.scroll_viewport_right();
+                ws.scroll_viewport_right_discrete(target_biased);
+            }
+        }
+    }
+
+    pub fn scroll_viewport(&mut self, amount: f64) {
+        let monitors = match &mut self.monitor_set {
+            MonitorSet::Normal { monitors, .. } => monitors,
+            MonitorSet::NoOutputs { .. } => return,
+        };
+
+        for monitor in monitors {
+            for ws in &mut monitor.workspaces {
+                ws.scroll_viewport(amount);
             }
         }
     }
