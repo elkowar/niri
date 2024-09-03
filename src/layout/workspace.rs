@@ -2728,34 +2728,25 @@ impl<W: LayoutElement> Workspace<W> {
         };
         let last_visible = visible_columns.last().unwrap_or(first_visible);
 
-        let shifted_by_left_side = if first_visible != 0 {
-            Some(self.column_x(first_visible - 1) - self.options.gaps)
-        } else {
-            None
-        };
+        let shifted_by_left_side =
+            (first_visible != 0).then(|| self.column_x(first_visible - 1) - self.options.gaps);
 
-        let shifted_by_right_side = if last_visible != 0 {
+        let shifted_by_right_side = (last_visible != 0).then(|| {
             let new_right_edge = self.right_column_edge(last_visible - 1) + self.options.gaps;
-            Some(new_right_edge - self.view_size().w)
-        } else {
-            None
+            new_right_edge - self.view_size().w
+        });
+
+        let view_pos = self.view_pos();
+        let target_view_pos = match (shifted_by_left_side, shifted_by_right_side) {
+            (Some(a), Some(b)) if (a - view_pos).abs() < (b - view_pos).abs() => Some(a),
+            (Some(_), Some(b)) => Some(b),
+            (Some(a), None) | (None, Some(a)) => Some(a),
+            (None, None) => None,
         };
 
-        let target_view_pos = if let Some((a, b)) = shifted_by_left_side.zip(shifted_by_right_side)
-        {
-            if (a - self.view_pos()).abs() < (b - self.view_pos()).abs() {
-                Some(a)
-            } else {
-                Some(b)
-            }
-        } else {
-            shifted_by_left_side.or(shifted_by_right_side)
+        if let Some(target_view_pos) = target_view_pos {
+            self.scroll_viewport_to(target_view_pos);
         };
-        let Some(target_view_pos) = target_view_pos else {
-            return;
-        };
-
-        self.scroll_viewport_to(target_view_pos);
     }
 
     pub fn scroll_viewport_right_discrete(&mut self) {
@@ -2764,32 +2755,26 @@ impl<W: LayoutElement> Workspace<W> {
             return;
         };
         let last_visible = visible_columns.last().unwrap_or(first_visible);
-        let shifted_by_right_side = if last_visible + 1 < self.columns.len() {
+
+        let shifted_by_right_side = (last_visible + 1 < self.columns.len()).then(|| {
             let new_right_edge = self.right_column_edge(last_visible + 1) + self.options.gaps;
-            Some(new_right_edge - self.view_size().w)
-        } else {
-            None
+            new_right_edge - self.view_size().w
+        });
+
+        let shifted_by_left_side = (first_visible < self.columns.len() - 1)
+            .then(|| self.column_x(first_visible + 1) - self.options.gaps);
+
+        let view_pos = self.view_pos();
+        let target_view_pos = match (shifted_by_left_side, shifted_by_right_side) {
+            (Some(a), Some(b)) if (a - view_pos).abs() < (b - view_pos).abs() => Some(a),
+            (Some(_), Some(b)) => Some(b),
+            (Some(a), None) | (None, Some(a)) => Some(a),
+            (None, None) => return,
         };
 
-        let shifted_by_left_side = if first_visible < self.columns.len() - 1 {
-            Some(self.column_x(first_visible + 1) - self.options.gaps)
-        } else {
-            None
+        if let Some(target_view_pos) = target_view_pos {
+            self.scroll_viewport_to(target_view_pos);
         };
-        let target_view_pos = if let Some((a, b)) = shifted_by_left_side.zip(shifted_by_right_side)
-        {
-            if (a - self.view_pos()).abs() < (b - self.view_pos()).abs() {
-                Some(a)
-            } else {
-                Some(b)
-            }
-        } else {
-            shifted_by_left_side.or(shifted_by_right_side)
-        };
-        let Some(target_view_pos) = target_view_pos else {
-            return;
-        };
-        self.scroll_viewport_to(target_view_pos);
     }
 
     pub fn scroll_viewport(&mut self, amount: f64) {
