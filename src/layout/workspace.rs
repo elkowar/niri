@@ -1,4 +1,4 @@
-use std::cmp::{max, min, min_by_key};
+use std::cmp::{max, min};
 use std::iter::{self, zip};
 use std::rc::Rc;
 use std::time::Duration;
@@ -6,14 +6,12 @@ use std::time::Duration;
 use niri_config::{CenterFocusedColumn, PresetWidth, Struts, Workspace as WorkspaceConfig};
 use niri_ipc::SizeChange;
 use ordered_float::NotNan;
-use smithay::backend::egl::ffi::egl::QueryStreamu64KHR::is_loaded;
 use smithay::backend::renderer::gles::GlesRenderer;
 use smithay::desktop::{layer_map_for_output, Window};
 use smithay::output::Output;
 use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Logical, Point, Rectangle, Scale, Serial, Size, Transform};
-use tracing::Instrument;
 
 use super::closing_window::{ClosingWindow, ClosingWindowRenderElement};
 use super::tile::{Tile, TileRenderElement};
@@ -2732,28 +2730,26 @@ impl<W: LayoutElement> Workspace<W> {
             return;
         };
         let last_visible = visible_columns.last().unwrap_or(first_visible);
+        let gaps = self.options.gaps;
+        let col_count = self.columns.len();
+        let view_width = self.view_size().w;
 
-        let (shifted_by_right_side, shifted_by_left_side) = if rightwards {
-            let shifted_by_right_side = (last_visible + 1 < self.columns.len()).then(|| {
-                let new_right_edge = self.right_column_edge(last_visible + 1) + self.options.gaps;
-                new_right_edge - self.view_size().w
-            });
-
-            let shifted_by_left_side = (first_visible < self.columns.len() - 1)
-                .then(|| self.column_x(first_visible + 1) - self.options.gaps);
-            (shifted_by_right_side, shifted_by_left_side)
+        let shifted_by_right_side = if rightwards {
+            (last_visible + 1 < col_count)
+                .then(|| (self.right_column_edge(last_visible + 1) + gaps) - view_width)
         } else {
-            let shifted_by_left_side =
-                (first_visible != 0).then(|| self.column_x(first_visible - 1) - self.options.gaps);
+            (last_visible != 0)
+                .then(|| (self.right_column_edge(last_visible - 1) + gaps) - view_width)
+        };
 
-            let shifted_by_right_side = (last_visible != 0).then(|| {
-                let new_right_edge = self.right_column_edge(last_visible - 1) + self.options.gaps;
-                new_right_edge - self.view_size().w
-            });
-            (shifted_by_right_side, shifted_by_left_side)
+        let shifted_by_left_side = if rightwards {
+            (first_visible < col_count - 1).then(|| self.column_x(first_visible + 1) - gaps)
+        } else {
+            (first_visible != 0).then(|| self.column_x(first_visible - 1) - gaps)
         };
 
         let view_pos = self.view_pos();
+        // Use the variant that requires less movement, if both are viable.
         let target_view_pos = match (shifted_by_left_side, shifted_by_right_side) {
             (Some(a), Some(b)) if (a - view_pos).abs() < (b - view_pos).abs() => Some(a),
             (Some(_), Some(b)) => Some(b),
