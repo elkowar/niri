@@ -2664,14 +2664,16 @@ impl<W: LayoutElement> Workspace<W> {
         true
     }
 
+    pub fn right_column_edge(&self, column_idx: usize) -> f64 {
+        self.column_x(column_idx) + self.columns[column_idx].width()
+    }
+
     pub fn fully_visible_columns(&self) -> impl Iterator<Item = usize> + '_ {
         let view_pos = self.view_pos();
         let view_width = self.view_size().w;
         (0..self.columns.len())
             .skip_while(move |&col| self.column_x(col) < view_pos)
-            .take_while(move |&col| {
-                self.column_x(col) + self.columns[col].width() <= view_pos + view_width
-            })
+            .take_while(move |&col| self.right_column_edge(col) <= view_pos + view_width)
     }
 
     pub fn scroll_viewport_left(&mut self) {
@@ -2684,34 +2686,30 @@ impl<W: LayoutElement> Workspace<W> {
         let new_left_edge = self.column_x(first_visible - 1) - self.options.gaps;
         let new_right_edge = new_left_edge + self.view_size().w;
 
-        let should_refocus = new_right_edge
-            < self.column_x(self.active_column_idx) + self.columns[self.active_column_idx].width();
+        let new_focused = if new_right_edge
+            >= self.right_column_edge(self.active_column_idx) + self.options.gaps
+        {
+            self.active_column_idx
+        } else {
+            (0..self.columns.len())
+                .rev()
+                .find(|&col_idx| {
+                    self.right_column_edge(col_idx) + self.options.gaps <= new_right_edge
+                })
+                .unwrap_or(self.active_column_idx)
+        };
 
-        if should_refocus {
-            let mut new_focused = self.active_column_idx - 1;
-            for col_idx in (0..self.columns.len()).rev() {
-                if self.column_x(col_idx) + self.columns[col_idx].width() + self.options.gaps
-                    <= new_right_edge
-                {
-                    new_focused = col_idx;
-                    break;
-                }
-            }
-            self.animate_view_offset(
-                self.view_pos(),
-                new_focused,
-                new_left_edge - self.column_x(new_focused),
-            );
+        self.animate_view_offset(
+            self.view_pos(),
+            new_focused,
+            new_left_edge - self.column_x(new_focused),
+        );
+
+        if new_focused != self.active_column_idx {
             self.active_column_idx = new_focused;
             self.activate_prev_column_on_removal = None;
             self.view_offset_before_fullscreen = None;
             self.interactive_resize = None;
-        } else {
-            self.animate_view_offset(
-                self.view_pos(),
-                self.active_column_idx,
-                new_left_edge - self.column_x(self.active_column_idx),
-            );
         }
     }
 
@@ -2722,33 +2720,30 @@ impl<W: LayoutElement> Workspace<W> {
         if last_visible + 1 >= self.columns.len() {
             return;
         }
-        let new_right_edge = self.column_x(last_visible + 1)
-            + self.columns[last_visible + 1].width()
-            + self.options.gaps;
+        let new_right_edge = self.right_column_edge(last_visible + 1) + self.options.gaps;
         let new_left_edge = new_right_edge - self.view_size().w;
-        if new_left_edge > self.column_x(self.active_column_idx) {
-            let new_focused = self
-                .column_xs(self.data.iter().copied())
+
+        let new_focused = if new_left_edge <= self.column_x(self.active_column_idx) {
+            self.active_column_idx
+        } else {
+            self.column_xs(self.data.iter().copied())
                 .enumerate()
                 .find(|(_, x)| *x > new_left_edge)
                 .map(|(idx, _)| idx)
-                .unwrap_or(self.active_column_idx + 1);
+                .unwrap_or(self.active_column_idx + 1)
+        };
 
-            self.animate_view_offset(
-                self.view_pos(),
-                new_focused,
-                new_left_edge - self.column_x(new_focused),
-            );
+        self.animate_view_offset(
+            self.view_pos(),
+            new_focused,
+            new_left_edge - self.column_x(new_focused),
+        );
+
+        if self.active_column_idx != new_focused {
             self.active_column_idx = new_focused;
             self.activate_prev_column_on_removal = None;
             self.view_offset_before_fullscreen = None;
             self.interactive_resize = None;
-        } else {
-            self.animate_view_offset(
-                self.view_pos(),
-                self.active_column_idx,
-                new_left_edge - self.column_x(self.active_column_idx),
-            );
         }
     }
 
