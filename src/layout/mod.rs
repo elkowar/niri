@@ -2269,7 +2269,7 @@ impl<W: LayoutElement> Layout<W> {
 
         for monitor in monitors {
             for ws in &mut monitor.workspaces {
-                ws.scroll_viewport_left_discrete();
+                ws.scroll_viewport_by_column(false);
             }
         }
     }
@@ -2282,7 +2282,7 @@ impl<W: LayoutElement> Layout<W> {
 
         for monitor in monitors {
             for ws in &mut monitor.workspaces {
-                ws.scroll_viewport_right_discrete();
+                ws.scroll_viewport_by_column(true);
             }
         }
     }

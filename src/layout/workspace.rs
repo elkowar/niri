@@ -2721,48 +2721,37 @@ impl<W: LayoutElement> Workspace<W> {
         }
     }
 
-    pub fn scroll_viewport_left_discrete(&mut self) {
+    /// Scroll viewport to the left or right by one column.
+    ///
+    /// Implements smart logic to scroll by one column either on the left or right,
+    /// meaning that we either bring a new column fully into view, or scroll one column fully out of the view,
+    /// whichever of those two requires less movement.
+    pub fn scroll_viewport_by_column(&mut self, rightwards: bool) {
         let mut visible_columns = self.fully_visible_columns();
         let Some(first_visible) = visible_columns.next() else {
             return;
         };
         let last_visible = visible_columns.last().unwrap_or(first_visible);
 
-        let shifted_by_left_side =
-            (first_visible != 0).then(|| self.column_x(first_visible - 1) - self.options.gaps);
+        let (shifted_by_right_side, shifted_by_left_side) = if rightwards {
+            let shifted_by_right_side = (last_visible + 1 < self.columns.len()).then(|| {
+                let new_right_edge = self.right_column_edge(last_visible + 1) + self.options.gaps;
+                new_right_edge - self.view_size().w
+            });
 
-        let shifted_by_right_side = (last_visible != 0).then(|| {
-            let new_right_edge = self.right_column_edge(last_visible - 1) + self.options.gaps;
-            new_right_edge - self.view_size().w
-        });
+            let shifted_by_left_side = (first_visible < self.columns.len() - 1)
+                .then(|| self.column_x(first_visible + 1) - self.options.gaps);
+            (shifted_by_right_side, shifted_by_left_side)
+        } else {
+            let shifted_by_left_side =
+                (first_visible != 0).then(|| self.column_x(first_visible - 1) - self.options.gaps);
 
-        let view_pos = self.view_pos();
-        let target_view_pos = match (shifted_by_left_side, shifted_by_right_side) {
-            (Some(a), Some(b)) if (a - view_pos).abs() < (b - view_pos).abs() => Some(a),
-            (Some(_), Some(b)) => Some(b),
-            (Some(a), None) | (None, Some(a)) => Some(a),
-            (None, None) => None,
+            let shifted_by_right_side = (last_visible != 0).then(|| {
+                let new_right_edge = self.right_column_edge(last_visible - 1) + self.options.gaps;
+                new_right_edge - self.view_size().w
+            });
+            (shifted_by_right_side, shifted_by_left_side)
         };
-
-        if let Some(target_view_pos) = target_view_pos {
-            self.scroll_viewport_to(target_view_pos);
-        };
-    }
-
-    pub fn scroll_viewport_right_discrete(&mut self) {
-        let mut visible_columns = self.fully_visible_columns();
-        let Some(first_visible) = visible_columns.next() else {
-            return;
-        };
-        let last_visible = visible_columns.last().unwrap_or(first_visible);
-
-        let shifted_by_right_side = (last_visible + 1 < self.columns.len()).then(|| {
-            let new_right_edge = self.right_column_edge(last_visible + 1) + self.options.gaps;
-            new_right_edge - self.view_size().w
-        });
-
-        let shifted_by_left_side = (first_visible < self.columns.len() - 1)
-            .then(|| self.column_x(first_visible + 1) - self.options.gaps);
 
         let view_pos = self.view_pos();
         let target_view_pos = match (shifted_by_left_side, shifted_by_right_side) {
